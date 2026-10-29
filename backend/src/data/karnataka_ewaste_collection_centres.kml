@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document id="root_doc">
+<Schema name="ka_ewaste_collection_centres" id="ka_ewaste_collection_centres">
+	<SimpleField name="OBJECTID" type="int"></SimpleField>
+	<SimpleField name="KGISCode" type="string"></SimpleField>
+	<SimpleField name="DepartmentCode" type="string"></SimpleField>
+	<SimpleField name="KGISEWCCID" type="int"></SimpleField>
+	<SimpleField name="EWCCName" type="string"></SimpleField>
+	<SimpleField name="KGISVillageID" type="int"></SimpleField>
+	<SimpleField name="KGISWardID" type="string"></SimpleField>
+</Schema>
+<Folder><name>ka_ewaste_collection_centres</name>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">1</SimpleData>
+		<SimpleData name="KGISCode">29572055428031620000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">1</SimpleData>
+		<SimpleData name="KGISEWCCID">1</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Play’ n’ Speak, Bengaluru</SimpleData>
+		<SimpleData name="KGISVillageID">15094</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.6400401,12.970527</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">2</SimpleData>
+		<SimpleData name="KGISCode">29572055428031620000FEPCBUNOCREWC0002</SimpleData>
+		<SimpleData name="DepartmentCode">2</SimpleData>
+		<SimpleData name="KGISEWCCID">2</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Saahas Zero Waste Solutions LLP, Bengaluru</SimpleData>
+		<SimpleData name="KGISVillageID">15680</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.5855361,12.9370286</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">3</SimpleData>
+		<SimpleData name="KGISCode">29572055436130630000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">3</SimpleData>
+		<SimpleData name="KGISEWCCID">3</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Vans Chemistry Pvt Limited, Bengaluru</SimpleData>
+		<SimpleData name="KGISVillageID">15534</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.6794589,12.846295</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">4</SimpleData>
+		<SimpleData name="KGISCode">29564054926042080000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">4</SimpleData>
+		<SimpleData name="KGISEWCCID">4</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Town Municipal Council, Haveri</SimpleData>
+		<SimpleData name="KGISVillageID">7505</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>75.4018351,14.7419279</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">5</SimpleData>
+		<SimpleData name="KGISCode">29555054398030350000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">5</SimpleData>
+		<SimpleData name="KGISEWCCID">5</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Town Panchayat, Belagavi</SimpleData>
+		<SimpleData name="KGISVillageID">1610</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>74.5090245,15.6409426</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">6</SimpleData>
+		<SimpleData name="KGISCode">29555054388030340000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">6</SimpleData>
+		<SimpleData name="KGISEWCCID">6</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Belgaum Municpal Corporation, Belagavi</SimpleData>
+		<SimpleData name="KGISVillageID">926</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>74.5165462,15.8730918</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">7</SimpleData>
+		<SimpleData name="KGISCode">29555054425983770000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">7</SimpleData>
+		<SimpleData name="KGISEWCCID">7</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Town Municipal Council, Belagavi</SimpleData>
+		<SimpleData name="KGISVillageID">1792</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>75.297146,15.9471918</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">8</SimpleData>
+		<SimpleData name="KGISCode">29564054928031040000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">8</SimpleData>
+		<SimpleData name="KGISEWCCID">8</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, City Municpal Council, Haveri</SimpleData>
+		<SimpleData name="KGISVillageID">7510</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>75.4009674,14.7887222</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">9</SimpleData>
+		<SimpleData name="KGISCode">29564054948031060000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">9</SimpleData>
+		<SimpleData name="KGISEWCCID">9</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Town Panchayat, Haveri</SimpleData>
+		<SimpleData name="KGISVillageID">7609</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>75.3978056,14.4561357</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">10</SimpleData>
+		<SimpleData name="KGISCode">29583056048032360000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">10</SimpleData>
+		<SimpleData name="KGISEWCCID">10</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Mohammed yahya, Bengaluru Rural</SimpleData>
+		<SimpleData name="KGISVillageID">20638</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.7894226,13.0769377</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">11</SimpleData>
+		<SimpleData name="KGISCode">29572055428031620000FEPCBUNOCREWC0003</SimpleData>
+		<SimpleData name="DepartmentCode">11</SimpleData>
+		<SimpleData name="KGISEWCCID">11</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Falcon Traders Limited, Bengaluru</SimpleData>
+		<SimpleData name="KGISVillageID">15144</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.5863319,12.9552581</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">12</SimpleData>
+		<SimpleData name="KGISCode">29572055428031620000FEPCBUNOCREWC0004</SimpleData>
+		<SimpleData name="DepartmentCode">12</SimpleData>
+		<SimpleData name="KGISEWCCID">12</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Hewlett Packard Enterprises India Private Limited, Bengaluru</SimpleData>
+		<SimpleData name="KGISVillageID">15500</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.6102603,12.9372983</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#ka_ewaste_collection_centres">
+		<SimpleData name="OBJECTID">13</SimpleData>
+		<SimpleData name="KGISCode">29583056046256660000FEPCBUNOCREWC0001</SimpleData>
+		<SimpleData name="DepartmentCode">13</SimpleData>
+		<SimpleData name="KGISEWCCID">13</SimpleData>
+		<SimpleData name="EWCCName">EWaste Collection Centre, Flipkart India Private Limited, Bengaluru Rural</SimpleData>
+		<SimpleData name="KGISVillageID">20696</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>77.8089914,12.9907491</coordinates></Point>
+  </Placemark>
+</Folder>
+</Document></kml>

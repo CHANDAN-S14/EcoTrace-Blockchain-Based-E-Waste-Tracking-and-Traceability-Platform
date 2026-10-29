@@ -1,0 +1,68 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme {
+  --color-primary: #176B45;
+  --color-primary-dark: #003B23;
+  --color-emerald: #239B66;
+  --color-mint: #E8F5EE;
+  --color-background: #FAFCFA;
+  --color-surface: #FFFFFF;
+  --color-text: #26352E;
+  --color-muted: #66756D;
+  --color-border: #E3EAE5;
+  --color-warning: #E9A23B;
+  --color-danger: #D94F4F;
+  --color-info: #3978C5;
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-heading: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: -0.022em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F4F7F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD8D0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #176B45;
+}
+
+/* Leaflet map overrides */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 10;
+}

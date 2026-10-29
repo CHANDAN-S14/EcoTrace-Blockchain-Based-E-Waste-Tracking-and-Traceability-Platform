@@ -1,0 +1,18 @@
+:root {
+  --color-primary: #176B45;
+  --color-primary-dark: #003B23;
+  --color-emerald: #239B66;
+  --color-mint: #E8F5EE;
+  --color-background: #FAFCFA;
+  --color-surface: #FFFFFF;
+  --color-text: #26352E;
+  --color-muted: #66756D;
+  --color-border: #E3EAE5;
+  --color-warning: #E9A23B;
+  --color-danger: #D94F4F;
+  --color-info: #3978C5;
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-heading: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+}

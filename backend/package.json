@@ -1,0 +1,36 @@
+{
+  "name": "ecotrace-backend",
+  "version": "1.0.0",
+  "description": "EcoTrace Industrial E-Waste Intelligence & Traceability Platform Backend",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js",
+    "test:contracts": "npx hardhat test",
+    "compile:contracts": "npx hardhat compile",
+    "deploy:contracts": "npx hardhat run scripts/deploy.js --network localhost"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.20.2",
+    "qrcode": "^1.5.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.18",
+    "supertest": "^7.0.0"
+  }
+}
