@@ -76,7 +76,7 @@ export function AuditCompliancePage() {
         .map(b => {
           const id = b.batchId || b.id
           seen.add(id)
-          const isAnchored = b.blockchainStatus === 'ANCHORED' || Boolean(b.blockchainHash && b.blockchainHash.length > 20)
+          const isAnchored = b.blockchainStatus === 'ANCHORED' || b.blockchainStatus === 'VERIFIED'
           const isVerified = b.blockchainStatus === 'VERIFIED'
           return {
             batchId: id,

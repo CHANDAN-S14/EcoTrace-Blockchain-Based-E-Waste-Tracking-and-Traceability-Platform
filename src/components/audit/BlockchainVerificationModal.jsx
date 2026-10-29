@@ -96,6 +96,7 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
     verified,
     isLiveRpc,
     isApiError,
+    contractAvailable,
     existsOnChain,
     message,
     mismatchReason,
@@ -116,10 +117,22 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
         {/* Header */}
         <div className="p-5 border-b border-[#E3EAE5] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-xl ${verified ? 'bg-[#E8F5EE] text-[#176B45]' : isApiError ? 'bg-red-50 text-red-700' : isLiveRpc === false ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+            <div className={`p-2 rounded-xl ${
+              verified
+                ? 'bg-[#E8F5EE] text-[#176B45]'
+                : isApiError
+                ? 'bg-red-50 text-red-700'
+                : isLiveRpc === false || data.status === 'RPC_OFFLINE'
+                ? 'bg-amber-50 text-amber-700'
+                : contractAvailable === false || data.status === 'CONTRACT_UNAVAILABLE'
+                ? 'bg-orange-50 text-orange-700'
+                : existsOnChain === false || data.status === 'NOT_REGISTERED'
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-red-50 text-red-700'
+            }`}>
               {verified ? (
                 <ShieldCheck className="w-5 h-5" />
-              ) : isLiveRpc === false ? (
+              ) : isLiveRpc === false || data.status === 'RPC_OFFLINE' ? (
                 <ServerOff className="w-5 h-5" />
               ) : (
                 <AlertTriangle className="w-5 h-5" />
@@ -171,7 +184,7 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
                 {message || 'Unable to connect to the EcoTrace verification service. Please check your backend connection.'}
               </p>
             </div>
-          ) : isLiveRpc === false ? (
+          ) : isLiveRpc === false || data.status === 'RPC_OFFLINE' ? (
             <div className="p-4 bg-[#FEF5E7] rounded-xl border border-[#FAD7A0] space-y-1 text-xs text-[#B8741A]">
               <div className="flex items-center gap-2">
                 <ServerOff className="w-4 h-4 text-[#E9A23B]" />
@@ -183,7 +196,19 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
                 {message || 'The EVM RPC node is currently unreachable. Verification cannot be confirmed on-chain.'}
               </p>
             </div>
-          ) : existsOnChain === false ? (
+          ) : contractAvailable === false || data.status === 'CONTRACT_UNAVAILABLE' ? (
+            <div className="p-4 bg-orange-50 rounded-xl border border-orange-200 space-y-1.5 text-xs text-orange-900">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-600" />
+                <h4 className="font-semibold text-orange-900">
+                  Smart Contract Unavailable / Not Deployed
+                </h4>
+              </div>
+              <p className="text-[11px] text-orange-800 leading-relaxed">
+                {message || `The blockchain RPC node is online, but the smart contract could not be verified at address ${contractAddress || 'unconfigured'}. Bytecode or ABI is unavailable on ${data.network || 'Sepolia'}.`}
+              </p>
+            </div>
+          ) : existsOnChain === false || data.status === 'NOT_REGISTERED' ? (
             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-2 text-xs">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />

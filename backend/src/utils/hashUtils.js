@@ -139,10 +139,3 @@ export function generateBatchId(seq) {
   const random = Math.floor(10000 + Math.random() * 90000)
   return `EW-${year}-${random}`
 }
-
-/**
- * Generate simulated or test transaction hash
- */
-export function generateTxHash() {
-  return '0x' + crypto.randomBytes(32).toString('hex').toLowerCase()
-}

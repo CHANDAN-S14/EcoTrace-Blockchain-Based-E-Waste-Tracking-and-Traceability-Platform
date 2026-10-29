@@ -19,6 +19,7 @@ export async function fetchBlockchainStatus() {
       rpcUrl: data.rpcUrl,
       contractAddress: data.contractAddress,
       hasContractCode: Boolean(data.hasContractCode),
+      contractAvailable: Boolean(data.contractAvailable),
       explorerUrl: data.explorerUrl,
       contractExplorerUrl: data.contractExplorerUrl,
       signerAddress: data.signerAddress,

@@ -202,7 +202,7 @@ export function AuditReportModal({ isOpen, batch, onClose }) {
   const blockchain = dossier?.blockchainVerification || {
     network: 'Ethereum Sepolia Testnet',
     chainId: 11155111,
-    contractAddress: '0xF81819d91d0d23612C888987cfA4EdC09e91B862',
+    contractAddress: '0xF81819d91d0D23612C888987cfA4EdC09e91B862',
     txHash: batch.blockchainTx || batch.blockchainHash || '',
     blockNumber: 7421890,
     evidenceDigestSha256: batch.evidenceHash,

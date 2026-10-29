@@ -12,7 +12,7 @@ let contractABI = []
 try {
   if (fs.existsSync(artifactPath)) {
     const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'))
-    contractABI = artifact.abi
+    contractABI = artifact.abi || []
   }
 } catch (err) {
   console.warn('[Blockchain] Could not load contract ABI:', err.message)
@@ -26,11 +26,48 @@ let validatedChainId = null
 let hasContractBytecode = false
 let signerBalanceEth = '0.0'
 
+/**
+ * Sanitize an RPC URL to mask API keys and credentials in logs and public responses
+ */
+export function sanitizeRpcUrl(url) {
+  if (!url || typeof url !== 'string') return ''
+  try {
+    const parsed = new URL(url)
+    if (parsed.search) {
+      parsed.search = ''
+    }
+    const pathSegments = parsed.pathname.split('/').filter(Boolean)
+    if (pathSegments.length > 0) {
+      const lastSeg = pathSegments[pathSegments.length - 1]
+      if (lastSeg.length >= 16 || lastSeg.startsWith('alch_') || lastSeg.includes('key')) {
+        pathSegments[pathSegments.length - 1] = '***'
+      }
+      parsed.pathname = '/' + pathSegments.join('/')
+    }
+    return parsed.toString()
+  } catch {
+    return url.replace(/([a-zA-Z0-9_-]{16,})/g, '***')
+  }
+}
+
+/**
+ * Validate that the contract ABI contains expected methods
+ */
+export function validateContractABI(abi) {
+  if (!Array.isArray(abi) || abi.length === 0) return false
+  const functionNames = abi
+    .filter((item) => item && (item.type === 'function' || !item.type))
+    .map((item) => item.name)
+  return functionNames.includes('registerBatch') && functionNames.includes('getBatchSummary')
+}
+
 export async function initBlockchain() {
   if (!CONFIG.BLOCKCHAIN.ENABLED) {
     console.log('[Blockchain] Integration disabled by configuration.')
     return false
   }
+
+  const safeRpcUrl = sanitizeRpcUrl(CONFIG.BLOCKCHAIN.RPC_URL)
 
   try {
     provider = new ethers.JsonRpcProvider(CONFIG.BLOCKCHAIN.RPC_URL)
@@ -43,17 +80,20 @@ export async function initBlockchain() {
         `[Blockchain] ❌ Chain ID mismatch: expected ${CONFIG.BLOCKCHAIN.CHAIN_ID} (${CONFIG.BLOCKCHAIN.NETWORK_NAME}), but connected RPC returned ${validatedChainId}.`
       )
       isConnected = false
+      contract = null
+      hasContractBytecode = false
       return false
     }
 
     console.log(
-      `[Blockchain] Connected to ${CONFIG.BLOCKCHAIN.NETWORK_NAME} RPC: ${CONFIG.BLOCKCHAIN.RPC_URL} (Chain ID: ${validatedChainId})`
+      `[Blockchain] Connected to ${CONFIG.BLOCKCHAIN.NETWORK_NAME} RPC: ${safeRpcUrl} (Chain ID: ${validatedChainId})`
     )
 
-    // Verify contract bytecode on target network
-    if (CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS && ethers.isAddress(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS)) {
+    // Verify contract address and bytecode on target network
+    const hasValidAddress = Boolean(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS && ethers.isAddress(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS))
+    if (hasValidAddress) {
       const code = await provider.getCode(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS)
-      hasContractBytecode = code && code !== '0x'
+      hasContractBytecode = Boolean(code && code !== '0x' && code !== '0x0')
       if (!hasContractBytecode) {
         console.warn(
           `[Blockchain] Notice: No deployed contract bytecode found at ${CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS} on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}.`
@@ -61,6 +101,8 @@ export async function initBlockchain() {
       } else {
         console.log(`[Blockchain] Verified contract code present at: ${CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS}`)
       }
+    } else {
+      hasContractBytecode = false
     }
 
     // Attach signer if private key is provided
@@ -77,23 +119,31 @@ export async function initBlockchain() {
       }
     }
 
-    // Attach contract instance
-    if (CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS && contractABI.length > 0 && signer) {
-      contract = new ethers.Contract(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS, contractABI, signer)
-    } else if (CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS && contractABI.length > 0 && provider) {
-      contract = new ethers.Contract(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS, contractABI, provider)
+    // Attach contract instance ONLY after validating address, ABI, and bytecode
+    const isAbiValid = validateContractABI(contractABI)
+    if (hasValidAddress && isAbiValid && hasContractBytecode) {
+      if (signer) {
+        contract = new ethers.Contract(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS, contractABI, signer)
+      } else if (provider) {
+        contract = new ethers.Contract(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS, contractABI, provider)
+      }
+    } else {
+      contract = null
     }
 
     isConnected = true
     return true
   } catch (err) {
-    console.warn(`[Blockchain] RPC at ${CONFIG.BLOCKCHAIN.RPC_URL} is offline: ${err.message}`)
+    console.warn(`[Blockchain] RPC at ${safeRpcUrl} is offline: ${err.message}`)
     isConnected = false
+    contract = null
+    hasContractBytecode = false
     return false
   }
 }
 
 export function getBlockchainStatus() {
+  const isReady = isConnected && Boolean(contract) && hasContractBytecode
   return {
     enabled: CONFIG.BLOCKCHAIN.ENABLED,
     connected: isConnected,
@@ -101,9 +151,10 @@ export function getBlockchainStatus() {
     networkSlug: CONFIG.BLOCKCHAIN.NETWORK,
     isSepolia: CONFIG.BLOCKCHAIN.IS_SEPOLIA,
     chainId: validatedChainId || CONFIG.BLOCKCHAIN.CHAIN_ID,
-    rpcUrl: CONFIG.BLOCKCHAIN.RPC_URL,
+    rpcUrl: sanitizeRpcUrl(CONFIG.BLOCKCHAIN.RPC_URL),
     contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
     hasContractCode: hasContractBytecode,
+    contractAvailable: Boolean(contract && hasContractBytecode),
     explorerUrl: CONFIG.BLOCKCHAIN.EXPLORER_URL,
     contractExplorerUrl:
       CONFIG.BLOCKCHAIN.EXPLORER_URL && CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS
@@ -111,9 +162,108 @@ export function getBlockchainStatus() {
         : null,
     signerAddress: signer ? signer.address : null,
     signerBalance: signerBalanceEth,
-    mode: isConnected
-      ? `Live ${CONFIG.BLOCKCHAIN.NETWORK_NAME} (Chain ID: ${validatedChainId})`
+    mode: isReady
+      ? `Live ${CONFIG.BLOCKCHAIN.NETWORK_NAME} (Chain ID: ${validatedChainId || CONFIG.BLOCKCHAIN.CHAIN_ID})`
+      : isConnected
+      ? `RPC Online, Contract Unavailable (${CONFIG.BLOCKCHAIN.NETWORK_NAME})`
       : 'Offline (RPC Node Unreachable)',
+  }
+}
+
+/**
+ * Perform a live real-time network connectivity and contract check
+ */
+export async function getLiveBlockchainStatus() {
+  if (!CONFIG.BLOCKCHAIN.ENABLED) {
+    return {
+      enabled: false,
+      connected: false,
+      network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
+      networkSlug: CONFIG.BLOCKCHAIN.NETWORK,
+      isSepolia: CONFIG.BLOCKCHAIN.IS_SEPOLIA,
+      chainId: CONFIG.BLOCKCHAIN.CHAIN_ID,
+      contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
+      hasContractCode: false,
+      contractAvailable: false,
+      mode: 'Disabled',
+    }
+  }
+
+  try {
+    if (!provider) {
+      await initBlockchain()
+    }
+    if (!provider) {
+      throw new Error('Provider could not be initialized')
+    }
+
+    // Ping the live RPC with a timeout
+    const networkPromise = provider.getNetwork()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('RPC request timed out after 5000ms')), 5000)
+    )
+    const network = await Promise.race([networkPromise, timeoutPromise])
+    validatedChainId = Number(network.chainId)
+
+    // Verify chain ID matches expected
+    if (CONFIG.BLOCKCHAIN.CHAIN_ID && validatedChainId !== CONFIG.BLOCKCHAIN.CHAIN_ID) {
+      isConnected = false
+      contract = null
+      hasContractBytecode = false
+      return {
+        ...getBlockchainStatus(),
+        connected: false,
+        contractAvailable: false,
+        error: `Chain ID mismatch: expected ${CONFIG.BLOCKCHAIN.CHAIN_ID}, got ${validatedChainId}`,
+        mode: `Chain Mismatch (Expected: ${CONFIG.BLOCKCHAIN.CHAIN_ID}, Got: ${validatedChainId})`,
+      }
+    }
+
+    isConnected = true
+
+    // Re-verify contract bytecode
+    const hasValidAddress = Boolean(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS && ethers.isAddress(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS))
+    if (hasValidAddress) {
+      const code = await provider.getCode(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS)
+      hasContractBytecode = Boolean(code && code !== '0x' && code !== '0x0')
+    } else {
+      hasContractBytecode = false
+    }
+
+    // Attach contract only if address, ABI, and bytecode are verified
+    const isAbiValid = validateContractABI(contractABI)
+    if (hasValidAddress && isAbiValid && hasContractBytecode) {
+      if (!contract) {
+        contract = signer
+          ? new ethers.Contract(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS, contractABI, signer)
+          : new ethers.Contract(CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS, contractABI, provider)
+      }
+    } else {
+      contract = null
+    }
+
+    // Refresh signer balance if present
+    if (signer && provider) {
+      try {
+        const bal = await provider.getBalance(signer.address)
+        signerBalanceEth = ethers.formatEther(bal)
+      } catch {}
+    }
+
+    return getBlockchainStatus()
+  } catch (err) {
+    const safeRpcUrl = sanitizeRpcUrl(CONFIG.BLOCKCHAIN.RPC_URL)
+    console.warn(`[Blockchain] Live connectivity check to ${safeRpcUrl} failed: ${err.message}`)
+    isConnected = false
+    contract = null
+    hasContractBytecode = false
+    return {
+      ...getBlockchainStatus(),
+      connected: false,
+      contractAvailable: false,
+      error: `RPC connection error: ${err.message}`,
+      mode: 'Offline (RPC Node Unreachable)',
+    }
   }
 }
 
@@ -398,6 +548,9 @@ export async function verifyEvidenceOnChain(batchId, evidenceHash) {
     return {
       verified: false,
       isLiveRpc: false,
+      contractAvailable: false,
+      existsOnChain: false,
+      status: 'INVALID_REQUEST',
       message: 'Batch ID is required for on-chain verification.',
     }
   }
@@ -409,79 +562,106 @@ export async function verifyEvidenceOnChain(batchId, evidenceHash) {
     await initBlockchain()
   }
 
-  if (isConnected && contract) {
-    try {
-      const summary = await contract.getBatchSummary(batchIdHash)
-      const exists = Boolean(summary[6])
-      const onChainEvidenceHash = normalizeBytes32(summary[0])
-      const registeredAt = Number(summary[1])
-      const registeredBy = summary[2]
-      const recoveryHash = summary[3]
-      const totalCustodyEvents = Number(summary[5])
-
-      const contractExplorerUrl = CONFIG.BLOCKCHAIN.EXPLORER_URL
-        ? `${CONFIG.BLOCKCHAIN.EXPLORER_URL}/address/${CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS}`
-        : null
-
-      if (!exists) {
-        return {
-          verified: false,
-          isLiveRpc: true,
-          existsOnChain: false,
-          network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
-          chainId: CONFIG.BLOCKCHAIN.CHAIN_ID,
-          contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
-          contractExplorerUrl,
-          localEvidenceHash: normalizedLocalEvidenceHash,
-          onChainEvidenceHash: null,
-          message: `Batch ${batchId} has not been anchored to the EcoTraceRegistry smart contract on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}.`,
-        }
-      }
-
-      // Strict cryptographic verification against immutable on-chain consensus digest
-      const isMatch = areDigestsEqual(onChainEvidenceHash, normalizedLocalEvidenceHash)
-
-      return {
-        verified: isMatch,
-        isLiveRpc: true,
-        existsOnChain: true,
-        network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
-        chainId: CONFIG.BLOCKCHAIN.CHAIN_ID,
-        contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
-        contractExplorerUrl,
-        localEvidenceHash: normalizedLocalEvidenceHash,
-        onChainEvidenceHash,
-        registeredAt: registeredAt > 0 ? new Date(registeredAt * 1000).toISOString() : null,
-        registeredBy,
-        recoveryHash: recoveryHash !== ethers.ZeroHash ? recoveryHash : null,
-        totalCustodyEvents,
-        mismatchReason: !isMatch
-          ? `Consignment intake metadata or evidence files do not match the on-chain consensus digest recorded on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}. The on-chain registration belongs to an intake under this identifier with different data, or the local documentation has been modified.`
-          : null,
-        message: isMatch
-          ? `Cryptographic evidence digest successfully verified against ${CONFIG.BLOCKCHAIN.NETWORK_NAME} consensus state.`
-          : `Evidence digest mismatch: provided digest does not match the immutably anchored digest on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}.`,
-      }
-    } catch (err) {
-      console.error(`[Blockchain] verifyEvidence error on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}:`, err.message)
-      return {
-        verified: false,
-        isLiveRpc: true,
-        network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
-        chainId: CONFIG.BLOCKCHAIN.CHAIN_ID,
-        contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
-        localEvidenceHash: normalizedLocalEvidenceHash,
-        message: `On-chain verification query failed on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}: ${err.message}`,
-      }
+  // 1. RPC node is offline
+  if (!isConnected) {
+    return {
+      verified: false,
+      isLiveRpc: false,
+      contractAvailable: false,
+      existsOnChain: false,
+      status: 'RPC_OFFLINE',
+      network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
+      chainId: CONFIG.BLOCKCHAIN.CHAIN_ID,
+      localEvidenceHash: normalizedLocalEvidenceHash,
+      message: `Blockchain node is offline (${CONFIG.BLOCKCHAIN.NETWORK_NAME} RPC unreachable). Verification cannot be performed against the live ledger.`,
     }
   }
 
-  return {
-    verified: false,
-    isLiveRpc: false,
-    network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
-    chainId: CONFIG.BLOCKCHAIN.CHAIN_ID,
-    localEvidenceHash: normalizedLocalEvidenceHash,
-    message: `Blockchain node is offline (${CONFIG.BLOCKCHAIN.NETWORK_NAME} RPC unreachable). Verification cannot be performed against the live ledger.`,
+  // 2. RPC is online, but smart contract is not available / deployed / missing bytecode
+  if (!contract || !hasContractBytecode) {
+    return {
+      verified: false,
+      isLiveRpc: true,
+      contractAvailable: false,
+      existsOnChain: false,
+      status: 'CONTRACT_UNAVAILABLE',
+      network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
+      chainId: validatedChainId || CONFIG.BLOCKCHAIN.CHAIN_ID,
+      contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
+      localEvidenceHash: normalizedLocalEvidenceHash,
+      message: `Smart contract is unavailable or not deployed at ${CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS || 'unconfigured address'} on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}.`,
+    }
+  }
+
+  try {
+    const summary = await contract.getBatchSummary(batchIdHash)
+    const exists = Boolean(summary[6])
+    const onChainEvidenceHash = normalizeBytes32(summary[0])
+    const registeredAt = Number(summary[1])
+    const registeredBy = summary[2]
+    const recoveryHash = summary[3]
+    const totalCustodyEvents = Number(summary[5])
+
+    const contractExplorerUrl = CONFIG.BLOCKCHAIN.EXPLORER_URL
+      ? `${CONFIG.BLOCKCHAIN.EXPLORER_URL}/address/${CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS}`
+      : null
+
+    // 3. Batch not registered on-chain
+    if (!exists) {
+      return {
+        verified: false,
+        isLiveRpc: true,
+        contractAvailable: true,
+        existsOnChain: false,
+        status: 'NOT_REGISTERED',
+        network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
+        chainId: validatedChainId || CONFIG.BLOCKCHAIN.CHAIN_ID,
+        contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
+        contractExplorerUrl,
+        localEvidenceHash: normalizedLocalEvidenceHash,
+        onChainEvidenceHash: null,
+        message: `Batch ${batchId} has not been anchored to the EcoTraceRegistry smart contract on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}.`,
+      }
+    }
+
+    // Strict cryptographic verification against immutable on-chain consensus digest
+    const isMatch = areDigestsEqual(onChainEvidenceHash, normalizedLocalEvidenceHash)
+
+    // 4 & 5. Evidence digest mismatch vs Verified consensus match
+    return {
+      verified: isMatch,
+      isLiveRpc: true,
+      contractAvailable: true,
+      existsOnChain: true,
+      status: isMatch ? 'VERIFIED' : 'DIGEST_MISMATCH',
+      network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
+      chainId: validatedChainId || CONFIG.BLOCKCHAIN.CHAIN_ID,
+      contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
+      contractExplorerUrl,
+      localEvidenceHash: normalizedLocalEvidenceHash,
+      onChainEvidenceHash,
+      registeredAt: registeredAt > 0 ? new Date(registeredAt * 1000).toISOString() : null,
+      registeredBy,
+      recoveryHash: recoveryHash !== ethers.ZeroHash ? recoveryHash : null,
+      totalCustodyEvents,
+      mismatchReason: !isMatch
+        ? `Consignment intake metadata or evidence files do not match the on-chain consensus digest recorded on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}. The on-chain registration belongs to an intake under this identifier with different data, or the local documentation has been modified.`
+        : null,
+      message: isMatch
+        ? `Cryptographic evidence digest successfully verified against ${CONFIG.BLOCKCHAIN.NETWORK_NAME} consensus state.`
+        : `Evidence digest mismatch: provided digest does not match the immutably anchored digest on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}.`,
+    }
+  } catch (err) {
+    console.error(`[Blockchain] verifyEvidence error on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}:`, err.message)
+    return {
+      verified: false,
+      isLiveRpc: true,
+      contractAvailable: true,
+      network: CONFIG.BLOCKCHAIN.NETWORK_NAME,
+      chainId: validatedChainId || CONFIG.BLOCKCHAIN.CHAIN_ID,
+      contractAddress: CONFIG.BLOCKCHAIN.CONTRACT_ADDRESS,
+      localEvidenceHash: normalizedLocalEvidenceHash,
+      message: `On-chain verification query failed on ${CONFIG.BLOCKCHAIN.NETWORK_NAME}: ${err.message}`,
+    }
   }
 }
