@@ -24,6 +24,7 @@ import {
 import { StatusBadge } from '../common/StatusBadge'
 import { formatWeight, truncateHash, formatDate } from '../../utils/formatters'
 import { useBatchStore } from '../../hooks/useBatchStore'
+import { resolveFileUrl } from '../../services/apiClient'
 
 const DEFAULT_SORTING_CATEGORIES = [
   'Computers & Laptops',
@@ -209,14 +210,14 @@ export function BatchDetailModal({ batch, onClose }) {
                   return (
                     <a
                       key={idx}
-                      href={file.url}
+                      href={resolveFileUrl(file.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-3 bg-white rounded-xl border border-[#E3EAE5] hover:border-[#176B45] flex items-center gap-3 transition-all hover:shadow-xs group cursor-pointer"
                     >
                       {isImage ? (
                         <img
-                          src={file.url}
+                          src={resolveFileUrl(file.url)}
                           alt={file.name}
                           className="w-12 h-12 rounded-lg object-cover border border-[#E3EAE5] shrink-0"
                         />

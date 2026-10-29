@@ -186,11 +186,17 @@ export function AuditCompliancePage() {
 
         // Refresh records in background to sync newly persisted status
         loadRecords(false)
+      } else if (verifyRes.isApiError) {
+        addToast({
+          type: 'danger',
+          title: 'Verification Request Failed',
+          message: verifyRes.message || 'Could not reach blockchain verification service.',
+        })
       } else if (verifyRes.isLiveRpc === false) {
         addToast({
           type: 'warning',
           title: 'Blockchain RPC Offline',
-          message: 'Local Hardhat/EVM node is currently offline. Verification could not be confirmed on-chain.',
+          message: 'The Ethereum/EVM RPC node is currently unreachable. Verification could not be confirmed on-chain.',
         })
       } else if (verifyRes.existsOnChain === false) {
         addToast({
@@ -204,6 +210,18 @@ export function AuditCompliancePage() {
           title: 'Digest Mismatch',
           message: `Evidence hash mismatch detected on ${batchId}.`,
         })
+      }
+
+      if (verifyRes.isLiveRpc) {
+        setBlockchainStatus(prev => ({
+          ...prev,
+          connected: true,
+          network: verifyRes.network || prev?.network || 'Ethereum Sepolia',
+          chainId: verifyRes.chainId || prev?.chainId || 11155111,
+          contractAddress: verifyRes.contractAddress || prev?.contractAddress,
+          contractExplorerUrl: verifyRes.contractExplorerUrl || prev?.contractExplorerUrl,
+          isSepolia: verifyRes.chainId === 11155111 || verifyRes.network?.includes('Sepolia'),
+        }))
       }
     } catch (err) {
       addToast({

@@ -19,6 +19,7 @@ import {
 import { StatusBadge } from '../common/StatusBadge'
 import { formatWeight, formatDate, truncateHash } from '../../utils/formatters'
 import { useBatchStore } from '../../hooks/useBatchStore'
+import { resolveFileUrl } from '../../services/apiClient'
 
 export function BatchAuditHistoryModal({ isOpen, batch, onClose, onVerifyOnChain, onGenerateCertificate }) {
   const { addToast } = useBatchStore()
@@ -163,7 +164,7 @@ export function BatchAuditHistoryModal({ isOpen, batch, onClose, onVerifyOnChain
                     {batch.evidenceFiles.map((file, idx) => (
                       <a
                         key={idx}
-                        href={file.url}
+                        href={resolveFileUrl(file.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-[#E8F5EE] border border-[#E3EAE5] hover:border-[#176B45] rounded-lg text-[10px] text-[#26352E] transition-colors"

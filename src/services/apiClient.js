@@ -23,24 +23,28 @@ let isBackendLive = false
  */
 export function getApiBaseUrl() {
   const envUrl = import.meta.env.VITE_API_BASE_URL
-  if (envUrl && /^https?:\/\//i.test(envUrl)) {
-    return envUrl.replace(/\/+$/, '')
-  }
+  let targetUrl = ''
 
-  // Check if running in browser
-  if (typeof window !== 'undefined' && window.location) {
+  if (envUrl && /^https?:\/\//i.test(envUrl)) {
+    targetUrl = envUrl.trim().replace(/\/+$/, '')
+  } else if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname
-    // If running on non-localhost/non-127.0.0.1 domain (e.g. Render, Vercel, Netlify)
+    // If running on non-localhost domain (e.g. fronted-1axq.onrender.com or any production host)
     if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return RENDER_PROD_URL
+      targetUrl = RENDER_PROD_URL
     }
   }
 
-  // In local development:
-  if (envUrl) {
-    return envUrl.replace(/\/+$/, '')
+  if (!targetUrl) {
+    targetUrl = envUrl ? envUrl.trim().replace(/\/+$/, '') : 'http://localhost:5000/api'
   }
-  return 'http://localhost:5000/api'
+
+  // Ensure absolute URLs end with /api
+  if (/^https?:\/\//i.test(targetUrl) && !targetUrl.endsWith('/api')) {
+    targetUrl = `${targetUrl}/api`
+  }
+
+  return targetUrl
 }
 
 /**
@@ -49,14 +53,38 @@ export function getApiBaseUrl() {
 export function buildApiUrl(endpoint) {
   const base = getApiBaseUrl().replace(/\/+$/, '')
   let cleanEndpoint = String(endpoint || '').trim()
+
   if (!cleanEndpoint.startsWith('/')) {
     cleanEndpoint = `/${cleanEndpoint}`
   }
+
   // Strip leading /api if base already ends with /api
   if (base.endsWith('/api') && cleanEndpoint.startsWith('/api/')) {
     cleanEndpoint = cleanEndpoint.replace(/^\/api/, '')
   }
+
   return `${base}${cleanEndpoint}`
+}
+
+/**
+ * Resolves backend-hosted static asset / upload URLs (e.g. /uploads/evidence.jpg)
+ * Ensures assets are NEVER requested from the static frontend host
+ */
+export function resolveFileUrl(filePathOrUrl) {
+  if (!filePathOrUrl) return ''
+  const str = String(filePathOrUrl).trim()
+  if (str.startsWith('data:') || str.startsWith('blob:') || /^https?:\/\//i.test(str)) {
+    return str
+  }
+
+  const cleanPath = str.replace(/^\/+/, '')
+  // Strip trailing /api to get root backend origin (e.g. https://ecotrace-blockchain-based-e-waste.onrender.com)
+  const hostBase = getApiBaseUrl().replace(/\/api\/?$/, '')
+
+  if (cleanPath.startsWith('uploads/')) {
+    return `${hostBase}/${cleanPath}`
+  }
+  return `${hostBase}/uploads/${cleanPath}`
 }
 
 function getAuthToken() {
@@ -162,7 +190,23 @@ export async function request(endpoint, options = {}) {
 }
 
 /**
- * Binary blob fetcher with automatic base URL, auth headers, and filename extraction
+ * Verifies that a given Blob starts with valid PDF magic bytes (%PDF-)
+ */
+export async function checkPdfMagicBytes(blob) {
+  if (!blob || !(blob instanceof Blob)) return false
+  try {
+    const slice = blob.slice(0, 5)
+    const text = await slice.text()
+    return text === '%PDF-'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Binary blob fetcher with automatic base URL, auth headers, content-type verification,
+ * and filename extraction from Content-Disposition.
+ * Rejects JSON error responses even if HTTP 200 was sent.
  */
 export async function fetchBlob(endpoint, options = {}) {
   const url = buildApiUrl(endpoint)
@@ -170,7 +214,7 @@ export async function fetchBlob(endpoint, options = {}) {
   const timeoutMs = options.timeout ?? (DEFAULT_REQUEST_TIMEOUT_MS * 2) // 60s for PDF compilation
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-  const { timeout: _customTimeout, headers: customHeaders, ...fetchOptions } = options
+  const { timeout: _customTimeout, headers: customHeaders, expectedType = 'pdf', ...fetchOptions } = options
   const token = getAuthToken()
 
   const headers = {
@@ -188,6 +232,9 @@ export async function fetchBlob(endpoint, options = {}) {
     clearTimeout(timeoutId)
     isBackendLive = true
 
+    const contentType = response.headers.get('Content-Type') || ''
+    const isPdfExpected = expectedType === 'pdf' || endpoint.includes('/pdf')
+
     if (!response.ok) {
       let errorBody = null
       try {
@@ -204,7 +251,33 @@ export async function fetchBlob(endpoint, options = {}) {
       throw new ApiError(message, response.status, errorBody)
     }
 
+    // Guard: Prevent treating an HTTP 200 JSON payload as a valid PDF
+    if (isPdfExpected && contentType.includes('application/json')) {
+      let errJson = null
+      try {
+        errJson = await response.json()
+      } catch {}
+      const errMsg = errJson?.message || errJson?.error || 'Server returned a JSON response instead of a PDF document.'
+      throw new ApiError(errMsg, 502, errJson)
+    }
+
     const blob = await response.blob()
+
+    // Validate PDF magic bytes: standard PDFs must begin with %PDF-
+    if (isPdfExpected) {
+      const isValidPdf = await checkPdfMagicBytes(blob)
+      if (!isValidPdf) {
+        let errorMsg = 'Invalid PDF document received from server'
+        try {
+          const rawText = await blob.text()
+          if (rawText.startsWith('{') || rawText.startsWith('[')) {
+            const parsed = JSON.parse(rawText)
+            errorMsg = parsed.message || parsed.error || errorMsg
+          }
+        } catch {}
+        throw new ApiError(errorMsg, 502, { invalidHeader: true, contentType })
+      }
+    }
 
     // Extract filename from Content-Disposition if present
     let filename = null
@@ -219,7 +292,7 @@ export async function fetchBlob(endpoint, options = {}) {
     return {
       blob,
       filename,
-      contentType: response.headers.get('Content-Type') || blob.type,
+      contentType: contentType || (isPdfExpected ? 'application/pdf' : blob.type),
       size: blob.size,
       ok: true,
     }

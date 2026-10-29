@@ -1,4 +1,4 @@
-import { request, fetchBlob, triggerBlobDownload, createBlobPreviewUrl, buildApiUrl } from './apiClient'
+import { request, fetchBlob, triggerBlobDownload, createBlobPreviewUrl, buildApiUrl, resolveFileUrl } from './apiClient'
 import { getLocalBatches } from './batchService'
 import { getLocalRecoveryLogs } from './recoveryService'
 
@@ -8,12 +8,30 @@ import { getLocalRecoveryLogs } from './recoveryService'
 export async function fetchBlockchainStatus() {
   try {
     const res = await request('/blockchain/status')
-    return res.data || res
+    const data = res.data || res
+    return {
+      enabled: data.enabled ?? true,
+      connected: Boolean(data.connected),
+      network: data.network || 'Ethereum Sepolia',
+      networkSlug: data.networkSlug || 'sepolia',
+      isSepolia: Boolean(data.isSepolia || data.chainId === 11155111 || data.network?.includes('Sepolia')),
+      chainId: data.chainId || 11155111,
+      rpcUrl: data.rpcUrl,
+      contractAddress: data.contractAddress,
+      hasContractCode: Boolean(data.hasContractCode),
+      explorerUrl: data.explorerUrl,
+      contractExplorerUrl: data.contractExplorerUrl,
+      signerAddress: data.signerAddress,
+      signerBalance: data.signerBalance,
+      mode: data.mode || (data.connected ? 'Live Blockchain' : 'Offline'),
+    }
   } catch (err) {
     return {
       connected: false,
-      network: 'Unknown',
-      mode: 'Offline',
+      network: 'Ethereum Sepolia',
+      isSepolia: true,
+      chainId: 11155111,
+      mode: 'Offline (RPC Connection Error)',
       error: err.message,
     }
   }
@@ -111,12 +129,17 @@ export async function verifyBatchOnChain(batchId, evidenceHash) {
       method: 'POST',
       body: JSON.stringify({ batchId, evidenceHash }),
     })
-    return res.data || res
+    const payload = res.data || res
+    return {
+      ...payload,
+      isApiError: false,
+    }
   } catch (err) {
     return {
       verified: false,
-      isLiveRpc: false,
-      message: err.message || 'Verification request failed',
+      isLiveRpc: null, // Unknown/API error, distinguishing API communication failure from verified RPC offline
+      isApiError: true,
+      message: err.message || 'Verification request failed to reach backend API',
       batchId,
     }
   }
@@ -126,7 +149,7 @@ export async function verifyBatchOnChain(batchId, evidenceHash) {
  * Anchors an unanchored batch to the smart contract
  */
 export async function anchorBatchToBlockchain(batchId, evidenceHash) {
-  return await request(`/blockchain/anchor/${batchId}`, {
+  return await request(`/blockchain/anchor/${encodeURIComponent(batchId)}`, {
     method: 'POST',
     body: JSON.stringify({ evidenceHash }),
   })
@@ -146,7 +169,8 @@ export async function reAnchorVersionedBatch(batchId, reason) {
  * Certifies a batch upon final regulatory compliance audit
  */
 export async function certifyBatchAudit(batchId) {
-  const res = await request(`/audit/${batchId}/certify`, {
+  const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+  const res = await request(`/audit/${encodeURIComponent(cleanId)}/certify`, {
     method: 'POST',
   })
   return res.data || res
@@ -157,7 +181,8 @@ export async function certifyBatchAudit(batchId) {
  */
 export async function fetchBatchAuditEvents(batchId) {
   try {
-    const res = await request(`/blockchain/transactions/${batchId}`)
+    const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+    const res = await request(`/blockchain/transactions/${encodeURIComponent(cleanId)}`)
     return res.data || []
   } catch {
     return []
@@ -169,7 +194,8 @@ export async function fetchBatchAuditEvents(batchId) {
  */
 export async function fetchBatchFullAuditReport(batchId) {
   try {
-    const res = await request(`/audit/report/${batchId}`)
+    const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+    const res = await request(`/audit/report/${encodeURIComponent(cleanId)}`)
     return res.data || res.report || res
   } catch (err) {
     console.warn(`[AuditService] Could not fetch remote audit dossier for ${batchId}:`, err.message)
@@ -194,7 +220,7 @@ export async function downloadBatchAuditPdf(batchId) {
     throw new Error('Batch ID is required to download audit PDF.')
   }
 
-  const result = await fetchBlob(`/audit/report/${encodeURIComponent(cleanId)}/pdf`)
+  const result = await fetchBlob(`/audit/report/${encodeURIComponent(cleanId)}/pdf`, { expectedType: 'pdf' })
   const targetFilename = result.filename || `EcoTrace_Audit_Report_${cleanId}.pdf`
   triggerBlobDownload(result.blob, targetFilename)
   return { ok: true, filename: targetFilename }
@@ -209,7 +235,7 @@ export async function viewBatchAuditPdf(batchId) {
     throw new Error('Batch ID is required to view audit PDF.')
   }
 
-  const result = await fetchBlob(`/audit/report/${encodeURIComponent(cleanId)}/pdf?view=true`)
+  const result = await fetchBlob(`/audit/report/${encodeURIComponent(cleanId)}/pdf?view=true`, { expectedType: 'pdf' })
   const preview = createBlobPreviewUrl(result.blob)
   return {
     ok: true,
@@ -233,9 +259,10 @@ export async function downloadBatchAuditCsv(batchId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ batchIds: [cleanId] }),
+    expectedType: 'csv',
   })
   const targetFilename = result.filename || `EcoTrace_Audit_${cleanId}.csv`
   triggerBlobDownload(result.blob, targetFilename)
   return { ok: true, filename: targetFilename }
 }
-
+export { resolveFileUrl }

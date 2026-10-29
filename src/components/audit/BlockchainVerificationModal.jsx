@@ -95,6 +95,7 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
     versionedBatchId,
     verified,
     isLiveRpc,
+    isApiError,
     existsOnChain,
     message,
     mismatchReason,
@@ -115,7 +116,7 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
         {/* Header */}
         <div className="p-5 border-b border-[#E3EAE5] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-xl ${verified ? 'bg-[#E8F5EE] text-[#176B45]' : isLiveRpc === false ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+            <div className={`p-2 rounded-xl ${verified ? 'bg-[#E8F5EE] text-[#176B45]' : isApiError ? 'bg-red-50 text-red-700' : isLiveRpc === false ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
               {verified ? (
                 <ShieldCheck className="w-5 h-5" />
               ) : isLiveRpc === false ? (
@@ -156,6 +157,18 @@ export function BlockchainVerificationModal({ isOpen, data, onClose, onBatchAnch
               </div>
               <p className="text-[11px] text-[#176B45] leading-relaxed">
                 {message || 'The SHA-256 evidence digest matches the immutable batch registration anchored on Ethereum Sepolia.'}
+              </p>
+            </div>
+          ) : isApiError ? (
+            <div className="p-4 bg-red-50 rounded-xl border border-red-200 space-y-1 text-xs text-red-800">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <h4 className="font-semibold text-red-900">
+                  Verification Service Communication Error
+                </h4>
+              </div>
+              <p className="text-[11px] text-red-700 leading-relaxed">
+                {message || 'Unable to connect to the EcoTrace verification service. Please check your backend connection.'}
               </p>
             </div>
           ) : isLiveRpc === false ? (

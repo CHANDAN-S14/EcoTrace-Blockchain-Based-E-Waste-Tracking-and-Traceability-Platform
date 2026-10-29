@@ -25,6 +25,7 @@ import { HandoverCard } from './HandoverCard'
 import { StatusBadge } from '../common/StatusBadge'
 import { formatWeight, formatDate, truncateHash } from '../../utils/formatters'
 import { getBatchCustodyStage, getBatchAvailableAction } from '../../utils/custodyStageUtils'
+import { resolveFileUrl } from '../../services/apiClient'
 
 export function BatchCustodyWorkspace({
   batch,
@@ -386,7 +387,7 @@ export function BatchCustodyWorkspace({
               >
                 <div className="flex items-center gap-2 min-w-0">
                   {file.type === 'photo' ? (
-                    <img src={file.url} alt={file.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                    <img src={resolveFileUrl(file.url)} alt={file.name} className="w-8 h-8 rounded-lg object-cover shrink-0" />
                   ) : (
                     <FileText className="w-8 h-8 text-red-500 shrink-0 p-1 bg-red-50 rounded-lg" />
                   )}
@@ -399,7 +400,7 @@ export function BatchCustodyWorkspace({
                 </div>
                 {file.url && (
                   <a
-                    href={file.url}
+                    href={resolveFileUrl(file.url)}
                     target="_blank"
                     rel="noreferrer"
                     className="p-1.5 text-gray-400 hover:text-[#176B45] rounded-lg transition-colors shrink-0"

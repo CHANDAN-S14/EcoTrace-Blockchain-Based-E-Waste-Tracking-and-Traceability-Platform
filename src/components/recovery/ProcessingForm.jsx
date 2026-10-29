@@ -28,6 +28,7 @@ import {
 import { calculateMassBalance } from '../../utils/massBalance'
 import { formatWeight, formatDate } from '../../utils/formatters'
 import { useBatchStore } from '../../hooks/useBatchStore'
+import { resolveFileUrl } from '../../services/apiClient'
 import { uploadEvidenceFile, uploadCameraSnapshot } from '../../services/recoveryService'
 
 /**
@@ -1321,7 +1322,7 @@ export function ProcessingForm({ onComplete }) {
                       <div className="flex items-center gap-2.5 min-w-0">
                         {isImage ? (
                           <img
-                            src={file.url}
+                            src={resolveFileUrl(file.url)}
                             alt="Evidence preview"
                             className="w-12 h-12 object-cover rounded-lg border border-[#E3EAE5] shrink-0"
                           />

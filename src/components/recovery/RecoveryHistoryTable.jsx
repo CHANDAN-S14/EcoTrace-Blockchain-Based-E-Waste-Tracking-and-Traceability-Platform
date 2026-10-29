@@ -23,6 +23,7 @@ import { EmptyState } from '../common/EmptyState'
 import { formatWeight, truncateHash, formatDate } from '../../utils/formatters'
 import { useBatchStore } from '../../hooks/useBatchStore'
 import { verifyClaimOnChain } from '../../services/recoveryService'
+import { resolveFileUrl } from '../../services/apiClient'
 
 export function RecoveryHistoryTable() {
   const { recoveryLogs, batches, setSelectedBatchForModal, addToast } = useBatchStore()
@@ -525,14 +526,14 @@ export function RecoveryHistoryTable() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           {isImage ? (
                             <a
-                              href={file.url}
+                              href={resolveFileUrl(file.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="shrink-0 group"
                               title="Click to view full photo"
                             >
                               <img
-                                src={file.url}
+                                src={resolveFileUrl(file.url)}
                                 alt={file.name || 'Evidence thumbnail'}
                                 className="w-12 h-12 object-cover rounded-lg border border-[#E3EAE5] group-hover:border-[#176B45] transition-colors"
                               />
@@ -554,7 +555,7 @@ export function RecoveryHistoryTable() {
                         </div>
 
                         <a
-                          href={file.url}
+                          href={resolveFileUrl(file.url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-2.5 py-1 text-[11px] font-medium text-[#176B45] hover:bg-[#E8F5EE] border border-[#C2E3D0] rounded-lg shrink-0 inline-flex items-center gap-1 transition-colors"

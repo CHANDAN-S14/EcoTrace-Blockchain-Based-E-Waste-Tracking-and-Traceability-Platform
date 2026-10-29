@@ -126,20 +126,53 @@ export async function getAuditRecords(req, res, next) {
 
 export async function certifyBatchAudit(req, res, next) {
   try {
-    const { batchId } = req.params
+    const rawBatchId = req.params.batchId || req.body?.batchId || req.query?.batchId
+    const cleanBatchId = String(rawBatchId || '').trim().replace(/\.pdf$/i, '')
+    if (!cleanBatchId) {
+      return res.status(400).json({ success: false, message: 'Batch ID is required for audit certification.' })
+    }
 
-    const batch = await Batch.findOne({ batchId })
+    const batch = await Batch.findOne({
+      $or: [
+        { batchId: cleanBatchId },
+        { batchId: { $regex: new RegExp(`^${cleanBatchId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { versionedBatchId: cleanBatchId },
+        { versionedBatchId: { $regex: new RegExp(`^${cleanBatchId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+      ],
+    })
     if (!batch) {
-      return res.status(404).json({ success: false, message: `Batch ${batchId} not found` })
+      return res.status(404).json({ success: false, message: `Batch ${cleanBatchId} not found` })
+    }
+
+    const canonicalBatchId = batch.batchId || cleanBatchId
+
+    // Idempotency: if already certified, return existing certificate information
+    if (batch.status === 'Audited' && batch.certificateId) {
+      return res.json({
+        success: true,
+        certified: true,
+        alreadyCertified: true,
+        certificateId: batch.certificateId,
+        message: `Consignment ${canonicalBatchId} is already certified under CPCB Certificate ${batch.certificateId}.`,
+        data: {
+          batchId: canonicalBatchId,
+          certificateId: batch.certificateId,
+          status: 'Audited',
+          blockchainStatus: batch.blockchainStatus,
+          alreadyCertified: true,
+        },
+      })
     }
 
     // 1. Retrieve complete custody history
-    const handovers = await CustodyEvent.find({ batchId }).sort({ step: 1 })
+    const handovers = await CustodyEvent.find({
+      $or: [{ batchId: canonicalBatchId }, { batchId: cleanBatchId }],
+    }).sort({ step: 1 })
 
     if (handovers.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `Consignment ${batchId} has no custody handover events recorded.`,
+        message: `Consignment ${canonicalBatchId} has no custody handover events recorded. Chain of custody must be established before regulatory audit certification.`,
       })
     }
 
@@ -147,7 +180,7 @@ export async function certifyBatchAudit(req, res, next) {
     if (unacceptedHandovers.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Consignment ${batchId} has ${unacceptedHandovers.length} unaccepted or pending custody handover(s). All custody transfers must be accepted and verified on-chain prior to final regulatory audit certification.`,
+        message: `Consignment ${canonicalBatchId} has ${unacceptedHandovers.length} unaccepted or pending custody handover(s). All custody transfers must be accepted and verified on-chain prior to final regulatory audit certification.`,
         pendingHandovers: unacceptedHandovers.map(h => ({
           handoverId: h.handoverId,
           step: h.step,
@@ -161,28 +194,30 @@ export async function certifyBatchAudit(req, res, next) {
     if (batch.status === 'Flagged Discrepancy') {
       return res.status(400).json({
         success: false,
-        message: `Consignment ${batchId} is flagged with an active discrepancy. Compliance resolution is required before regulatory certification.`,
+        message: `Consignment ${canonicalBatchId} is flagged with an active discrepancy. Compliance resolution is required before regulatory certification.`,
       })
     }
 
     // 3. Mass balance verified
-    const recovery = await RecoveryRecord.findOne({ batchId })
+    const recovery = await RecoveryRecord.findOne({
+      $or: [{ batchId: canonicalBatchId }, { batchId: cleanBatchId }],
+    })
     if (!recovery) {
       return res.status(400).json({
         success: false,
-        message: `Consignment ${batchId} has no processing & recovery record. Metallurgy assay and mass balance reconciliation required prior to audit.`,
+        message: `Consignment ${canonicalBatchId} has no processing & recovery record. Metallurgy assay and mass balance reconciliation required prior to audit.`,
       })
     }
 
     if (recovery.validationStatus !== 'Reconciled') {
       return res.status(400).json({
         success: false,
-        message: `Processing record for ${batchId} has status "${recovery.validationStatus}". Mass balance must be Reconciled (tolerance <= 0.5 kg).`,
+        message: `Processing record for ${canonicalBatchId} has status "${recovery.validationStatus}". Mass balance must be Reconciled (tolerance <= 0.5 kg).`,
       })
     }
 
     // 4. Verify on-chain registration & consensus
-    const onChainVerification = await verifyEvidenceOnChain(batchId, batch.evidenceHash)
+    const onChainVerification = await verifyEvidenceOnChain(canonicalBatchId, batch.evidenceHash)
     if (onChainVerification.existsOnChain && !onChainVerification.verified) {
       batch.blockchainStatus = 'MISMATCH_DETECTED'
       batch.mismatchDetails = {
@@ -194,25 +229,26 @@ export async function certifyBatchAudit(req, res, next) {
       await batch.save()
       return res.status(400).json({
         success: false,
-        message: `Consignment ${batchId} evidence digest does not match the immutable record on ${onChainVerification.network}. Regulatory audit cannot be certified until evidence discrepancy is resolved.`,
+        message: `Consignment ${canonicalBatchId} evidence digest does not match the immutable record on ${onChainVerification.network}. Regulatory audit cannot be certified until evidence discrepancy is resolved.`,
       })
     }
 
     const isVerifiedConsensus = onChainVerification.verified
 
-    // Update batch to Audited
+    const cleanNum = canonicalBatchId.replace(/[^0-9]/g, '').slice(-5) || Math.floor(10000 + Math.random() * 90000)
+    const certificateId = batch.certificateId || `CPCB-CERT-2026-${cleanNum}`
+    const certifiedAt = new Date().toISOString()
+
+    // Update batch to Audited and save certificateId
     batch.status = 'Audited'
+    batch.certificateId = certificateId
     batch.blockchainStatus = isVerifiedConsensus ? 'VERIFIED' : (batch.blockchainStatus || 'PENDING')
     await batch.save()
-
-    const cleanNum = batchId.replace(/[^0-9]/g, '').slice(-5) || Math.floor(10000 + Math.random() * 90000)
-    const certificateId = `CPCB-CERT-2026-${cleanNum}`
-    const certifiedAt = new Date().toISOString()
 
     // Log Audit Event
     await AuditEvent.create({
       eventType: 'FINAL_REGULATORY_AUDIT_CERTIFIED',
-      batchId,
+      batchId: canonicalBatchId,
       organization: 'Central Pollution Control Board',
       actor: req.user?.name || 'Dr. Sunita Rao, Senior Compliance Auditor',
       details: {
@@ -234,14 +270,15 @@ export async function certifyBatchAudit(req, res, next) {
       certified: true,
       certificateId,
       certifiedAt,
-      message: `Consignment ${batchId} successfully certified and audited under CPCB standard.`,
+      message: `Consignment ${canonicalBatchId} successfully certified and audited under CPCB standard.`,
       data: {
-        batchId,
+        batchId: canonicalBatchId,
         certificateId,
+        status: 'Audited',
+        blockchainStatus: batch.blockchainStatus,
         certifiedAt,
         auditor: req.user?.name || 'Dr. Sunita Rao, Senior Compliance Auditor',
         auditStatus: 'Verified',
-        status: 'Audited',
         grossWeight: batch.grossWeight,
         recoveredWeight: recovery.recoveredWeight,
         recoveryYield: recovery.recoveryYield,

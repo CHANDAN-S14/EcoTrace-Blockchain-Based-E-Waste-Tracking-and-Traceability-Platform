@@ -5,6 +5,7 @@ import {
   verifyEvidenceOnChain,
   checkBatchExistsOnChain,
   getBlockchainStatus,
+  initBlockchain,
 } from '../services/blockchainService.js'
 import { AuditEvent } from '../models/AuditEvent.js'
 import { Batch } from '../models/Batch.js'
@@ -351,7 +352,15 @@ export async function recordRecovery(req, res, next) {
 }
 
 export async function getStatus(req, res) {
-  const status = getBlockchainStatus()
+  let status = getBlockchainStatus()
+  if (!status.connected) {
+    try {
+      await initBlockchain()
+      status = getBlockchainStatus()
+    } catch (reconnectErr) {
+      console.warn('[Blockchain] Re-init check notice:', reconnectErr.message)
+    }
+  }
   return res.json({
     success: true,
     data: status,
