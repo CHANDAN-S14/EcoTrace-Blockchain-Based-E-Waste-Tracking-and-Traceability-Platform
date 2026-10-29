@@ -16,7 +16,10 @@ router.get('/export/pdf', exportReportsPdf)
 router.post('/export/pdf', exportReportsPdf)
 
 // Individual consignment comprehensive audit report & PDF
-router.get('/audit/:batchId/pdf', exportBatchAuditPdf)
+router.all('/audit/:batchId/pdf', exportBatchAuditPdf)
+router.all('/:batchId/pdf', exportBatchAuditPdf)
+router.all('/report/:batchId/pdf', exportBatchAuditPdf)
 router.get('/audit/:batchId', getBatchFullAuditReport)
+router.get('/:batchId', getBatchFullAuditReport)
 
 export default router

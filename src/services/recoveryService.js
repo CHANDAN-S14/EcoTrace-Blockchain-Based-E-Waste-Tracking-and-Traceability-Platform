@@ -67,13 +67,11 @@ export async function uploadEvidenceFile(file) {
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await fetch('http://localhost:5000/api/upload', {
+    const res = await request('/upload', {
       method: 'POST',
       body: formData,
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.message || 'File upload failed')
-    return data.data
+    return res.data || res
   } catch {
     return {
       name: file.name,

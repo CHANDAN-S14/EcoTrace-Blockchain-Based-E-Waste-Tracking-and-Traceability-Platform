@@ -1,4 +1,4 @@
-import { request } from './apiClient'
+import { request, fetchBlob, triggerBlobDownload, createBlobPreviewUrl, buildApiUrl } from './apiClient'
 import { getLocalBatches } from './batchService'
 import { getLocalRecoveryLogs } from './recoveryService'
 
@@ -178,46 +178,64 @@ export async function fetchBatchFullAuditReport(batchId) {
 }
 
 /**
+ * Returns a direct URL for the batch audit PDF (for window.open or iframe src)
+ */
+export function getBatchAuditPdfUrl(batchId, inline = false) {
+  const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+  return buildApiUrl(`/audit/report/${encodeURIComponent(cleanId)}/pdf${inline ? '?view=true' : ''}`)
+}
+
+/**
  * Downloads comprehensive PDF audit report for a consignment
  */
 export async function downloadBatchAuditPdf(batchId) {
-  const response = await fetch(`/api/audit/report/${encodeURIComponent(batchId)}/pdf`)
-  if (!response.ok) {
-    throw new Error(`Failed to download audit PDF: HTTP ${response.status}`)
+  const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+  if (!cleanId) {
+    throw new Error('Batch ID is required to download audit PDF.')
   }
-  const blob = await response.blob()
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `EcoTrace_Audit_Report_${batchId}.pdf`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
-  return true
+
+  const result = await fetchBlob(`/audit/report/${encodeURIComponent(cleanId)}/pdf`)
+  const targetFilename = result.filename || `EcoTrace_Audit_Report_${cleanId}.pdf`
+  triggerBlobDownload(result.blob, targetFilename)
+  return { ok: true, filename: targetFilename }
+}
+
+/**
+ * Retrieves PDF blob and returns a preview URL for inline viewing or browser tab
+ */
+export async function viewBatchAuditPdf(batchId) {
+  const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+  if (!cleanId) {
+    throw new Error('Batch ID is required to view audit PDF.')
+  }
+
+  const result = await fetchBlob(`/audit/report/${encodeURIComponent(cleanId)}/pdf?view=true`)
+  const preview = createBlobPreviewUrl(result.blob)
+  return {
+    ok: true,
+    url: preview.url,
+    blob: result.blob,
+    filename: result.filename || `EcoTrace_Audit_Report_${cleanId}.pdf`,
+    revoke: preview.revoke,
+  }
 }
 
 /**
  * Downloads CSV audit dataset for a consignment
  */
 export async function downloadBatchAuditCsv(batchId) {
-  const response = await fetch('/api/reports/export/csv', {
+  const cleanId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+  if (!cleanId) {
+    throw new Error('Batch ID is required to download audit CSV.')
+  }
+
+  const result = await fetchBlob('/reports/export/csv', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ batchIds: [batchId] }),
+    body: JSON.stringify({ batchIds: [cleanId] }),
   })
-  if (!response.ok) {
-    throw new Error(`Failed to download audit CSV: HTTP ${response.status}`)
-  }
-  const blob = await response.blob()
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `EcoTrace_Audit_${batchId}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
-  return true
+  const targetFilename = result.filename || `EcoTrace_Audit_${cleanId}.csv`
+  triggerBlobDownload(result.blob, targetFilename)
+  return { ok: true, filename: targetFilename }
 }
 

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useBatchStore } from '../hooks/useBatchStore'
 import { formatWeight, formatDate, truncateHash } from '../utils/formatters'
-import { request } from '../services/apiClient'
+import { request, fetchBlob, triggerBlobDownload } from '../services/apiClient'
 import { AuditReportModal } from '../components/audit/AuditReportModal'
 
 const CATEGORY_OPTIONS = [
@@ -171,30 +171,19 @@ export function ReportsPage() {
 
     setIsDownloadingPdf(true)
     try {
-      const response = await fetch('/api/reports/export/pdf', {
+      const result = await fetchBlob('/reports/export/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batchIds: selectedBatchIds }),
       })
 
-      if (!response.ok) {
-        let errMessage = 'Failed to generate PDF'
-        try {
-          const errJson = await response.json()
-          errMessage = errJson.message || errMessage
-        } catch {}
-        throw new Error(errMessage)
-      }
+      const targetFilename =
+        result.filename ||
+        (selectedBatchIds.length === 1
+          ? `EcoTrace_Audit_Report_${selectedBatchIds[0]}.pdf`
+          : `EcoTrace_Compliance_Report_${Date.now()}.pdf`)
 
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `EcoTrace_Compliance_Report_${Date.now()}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      triggerBlobDownload(result.blob, targetFilename)
 
       addToast({
         type: 'success',
@@ -226,25 +215,14 @@ export function ReportsPage() {
 
     setIsDownloadingCsv(true)
     try {
-      const response = await fetch('/api/reports/export/csv', {
+      const result = await fetchBlob('/reports/export/csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batchIds: selectedBatchIds }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to generate CSV')
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `ecotrace-batches-report-${Date.now()}.csv`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      const targetFilename = result.filename || `ecotrace-batches-report-${Date.now()}.csv`
+      triggerBlobDownload(result.blob, targetFilename)
 
       addToast({
         type: 'success',

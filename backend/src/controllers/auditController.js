@@ -270,15 +270,41 @@ export async function getComplianceStats(req, res, next) {
  * Compiles a comprehensive, real-data audit dossier for a single batch consignment
  */
 export async function compileBatchAuditDossier(batchId) {
-  const batch = await Batch.findOne({ batchId }).lean()
+  const cleanBatchId = String(batchId || '').trim().replace(/\.pdf$/i, '')
+  if (!cleanBatchId) return null
+
+  const batch = await Batch.findOne({
+    $or: [
+      { batchId: cleanBatchId },
+      { batchId: { $regex: new RegExp(`^${cleanBatchId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+      { versionedBatchId: cleanBatchId },
+      { versionedBatchId: { $regex: new RegExp(`^${cleanBatchId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+    ],
+  }).lean()
   if (!batch) return null
 
+  const canonicalBatchId = batch.batchId || cleanBatchId
+
   const [handovers, recovery, auditEvents, assignments, duplicateClaims, facilities] = await Promise.all([
-    CustodyEvent.find({ batchId }).sort({ step: 1 }).lean(),
-    RecoveryRecord.findOne({ batchId }).lean(),
-    AuditEvent.find({ batchId }).sort({ timestamp: 1 }).lean(),
-    RecyclerAssignment.find({ 'assignments.batchId': batchId }).sort({ createdAt: -1 }).lean(),
-    RecoveryRecord.find({ batchId, claimId: { $ne: null } }).lean(),
+    CustodyEvent.find({
+      $or: [{ batchId: canonicalBatchId }, { batchId: cleanBatchId }],
+    }).sort({ step: 1 }).lean(),
+    RecoveryRecord.findOne({
+      $or: [{ batchId: canonicalBatchId }, { batchId: cleanBatchId }],
+    }).lean(),
+    AuditEvent.find({
+      $or: [{ batchId: canonicalBatchId }, { batchId: cleanBatchId }],
+    }).sort({ timestamp: 1 }).lean(),
+    RecyclerAssignment.find({
+      $or: [
+        { 'assignments.batchId': canonicalBatchId },
+        { 'assignments.batchId': cleanBatchId },
+      ],
+    }).sort({ createdAt: -1 }).lean(),
+    RecoveryRecord.find({
+      $or: [{ batchId: canonicalBatchId }, { batchId: cleanBatchId }],
+      claimId: { $ne: null },
+    }).lean(),
     Facility.find({}).lean(),
   ])
 
@@ -286,10 +312,10 @@ export async function compileBatchAuditDossier(batchId) {
   let onChainVerification = { verified: false, isLiveRpc: false, blockNumber: null, txHash: null }
   try {
     if (batch.evidenceHash) {
-      onChainVerification = await verifyEvidenceOnChain(batchId, batch.evidenceHash)
+      onChainVerification = await verifyEvidenceOnChain(canonicalBatchId, batch.evidenceHash)
     }
   } catch (err) {
-    console.warn(`[AuditController] On-chain verification notice for ${batchId}:`, err.message)
+    console.warn(`[AuditController] On-chain verification notice for ${canonicalBatchId}:`, err.message)
   }
 
   // Weight metrics
@@ -679,7 +705,12 @@ export async function compileBatchAuditDossier(batchId) {
  */
 export async function getBatchFullAuditReport(req, res, next) {
   try {
-    const { batchId } = req.params
+    const rawBatchId = req.params.batchId || req.query.batchId || req.body?.batchId
+    const batchId = String(rawBatchId || '').trim().replace(/\.pdf$/i, '')
+    if (!batchId) {
+      return res.status(400).json({ success: false, message: 'Batch ID is required.' })
+    }
+
     const dossier = await compileBatchAuditDossier(batchId)
     if (!dossier) {
       return res.status(404).json({

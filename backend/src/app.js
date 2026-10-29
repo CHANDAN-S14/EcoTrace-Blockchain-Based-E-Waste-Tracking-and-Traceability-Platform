@@ -60,6 +60,7 @@ app.use(
       return callback(null, true) // Permissive for local development & evaluation
     },
     credentials: true,
+    exposedHeaders: ['Content-Disposition', 'Content-Type', 'Content-Length'],
   })
 )
 

@@ -23,6 +23,7 @@ import {
   MapPin,
   HelpCircle,
   ShieldAlert,
+  Eye,
 } from 'lucide-react'
 import { StatusBadge } from '../common/StatusBadge'
 import { formatWeight, formatDate, truncateHash } from '../../utils/formatters'
@@ -31,6 +32,7 @@ import {
   fetchBatchFullAuditReport,
   downloadBatchAuditPdf,
   downloadBatchAuditCsv,
+  viewBatchAuditPdf,
 } from '../../services/auditService'
 
 export function AuditReportModal({ isOpen, batch, onClose }) {
@@ -40,6 +42,10 @@ export function AuditReportModal({ isOpen, batch, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
   const [isDownloadingCsv, setIsDownloadingCsv] = useState(false)
+  const [viewMode, setViewMode] = useState('dossier') // 'dossier' | 'pdf'
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null)
+  const [isPdfLoading, setIsPdfLoading] = useState(false)
+  const [isViewingInTab, setIsViewingInTab] = useState(false)
 
   const batchId = batch?.batchId || batch?.id
 
@@ -248,6 +254,62 @@ export function AuditReportModal({ isOpen, batch, onClose }) {
     }
   }
 
+  // Cleanup preview blob URL when modal closes or unmounts
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrl) {
+        try {
+          window.URL.revokeObjectURL(pdfBlobUrl)
+        } catch {}
+      }
+    }
+  }, [pdfBlobUrl])
+
+  const handleToggleViewMode = async () => {
+    if (viewMode === 'dossier') {
+      setViewMode('pdf')
+      if (!pdfBlobUrl) {
+        setIsPdfLoading(true)
+        try {
+          const result = await viewBatchAuditPdf(batchId)
+          setPdfBlobUrl(result.url)
+        } catch (err) {
+          addToast({
+            type: 'danger',
+            title: 'PDF Preview Error',
+            message: err.message || 'Could not load PDF document.',
+          })
+          setViewMode('dossier')
+        } finally {
+          setIsPdfLoading(false)
+        }
+      }
+    } else {
+      setViewMode('dossier')
+    }
+  }
+
+  const handleOpenPdfInTab = async () => {
+    setIsViewingInTab(true)
+    try {
+      const result = await viewBatchAuditPdf(batchId)
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+      addToast({
+        type: 'info',
+        title: 'Opening PDF',
+        message: `Opening official audit certificate for ${batchId} in browser tab.`,
+      })
+    } catch (err) {
+      addToast({
+        type: 'danger',
+        title: 'View PDF Failed',
+        message: err.message || 'Could not open audit certificate PDF.',
+      })
+    } finally {
+      setIsViewingInTab(false)
+    }
+  }
+
   const copyToClipboard = (text, label) => {
     navigator.clipboard?.writeText(text)
     addToast({
@@ -282,6 +344,40 @@ export function AuditReportModal({ isOpen, batch, onClose }) {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Toggle PDF Preview vs Interactive Dossier */}
+            <button
+              onClick={handleToggleViewMode}
+              disabled={isPdfLoading}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors cursor-pointer shadow-2xs ${
+                viewMode === 'pdf'
+                  ? 'bg-[#E8F5EE] text-[#176B45] border-[#C2E3D0]'
+                  : 'text-[#26352E] hover:bg-[#F4F7F5] border-[#E3EAE5]'
+              }`}
+              title={viewMode === 'pdf' ? 'Switch to interactive dossier view' : 'Preview compiled CPCB PDF document'}
+            >
+              {isPdfLoading ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#176B45]" />
+              ) : viewMode === 'pdf' ? (
+                <FileText className="w-3.5 h-3.5 text-[#176B45]" />
+              ) : (
+                <Eye className="w-3.5 h-3.5 text-[#66756D]" />
+              )}
+              <span className="hidden sm:inline">
+                {viewMode === 'pdf' ? 'Interactive View' : 'Preview PDF'}
+              </span>
+            </button>
+
+            {/* View PDF In Browser Tab */}
+            <button
+              onClick={handleOpenPdfInTab}
+              disabled={isViewingInTab}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#26352E] hover:bg-[#F4F7F5] rounded-xl border border-[#E3EAE5] transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+              title="Open compiled CPCB audit PDF in a new browser tab"
+            >
+              <ExternalLink className={`w-3.5 h-3.5 text-[#66756D] ${isViewingInTab ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">Open in Tab</span>
+            </button>
+
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#26352E] hover:bg-[#F4F7F5] rounded-xl border border-[#E3EAE5] transition-colors cursor-pointer shadow-2xs"
@@ -321,8 +417,36 @@ export function AuditReportModal({ isOpen, batch, onClose }) {
           </div>
         </div>
 
-        {/* Printable Comprehensive Audit Report Document */}
-        <div className="p-6 sm:p-10 space-y-8 text-[#26352E] flex-1" id="printable-audit-report">
+        {viewMode === 'pdf' ? (
+          <div className="p-4 sm:p-6 flex-1 flex flex-col items-center justify-center min-h-[600px] bg-[#F8FAF9]">
+            {isPdfLoading ? (
+              <div className="flex flex-col items-center justify-center space-y-3 py-20 text-[#176B45]">
+                <RefreshCw className="w-8 h-8 animate-spin text-[#176B45]" />
+                <span className="text-sm font-semibold">Compiling Statutory Audit Report PDF...</span>
+                <span className="text-xs text-[#66756D]">Retrieving verified batch ledger records from CPCB registry</span>
+              </div>
+            ) : pdfBlobUrl ? (
+              <iframe
+                src={pdfBlobUrl}
+                title={`EcoTrace Audit PDF - ${batchId}`}
+                className="w-full h-[76vh] rounded-2xl border border-[#CBD8D0] shadow-inner bg-white"
+              />
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <p className="text-sm font-medium">PDF preview could not be displayed directly.</p>
+                <button
+                  onClick={handleOpenPdfInTab}
+                  className="mt-3 px-4 py-2 bg-[#176B45] text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Open in New Browser Tab
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Printable Comprehensive Audit Report Document */
+          <div className="p-6 sm:p-10 space-y-8 text-[#26352E] flex-1" id="printable-audit-report">
           {/* Header Banner */}
           <div className="rounded-2xl bg-[#E8F5EE] border-2 border-[#C2E3D0] p-6 text-[#003B23] relative overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -974,6 +1098,7 @@ export function AuditReportModal({ isOpen, batch, onClose }) {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   )

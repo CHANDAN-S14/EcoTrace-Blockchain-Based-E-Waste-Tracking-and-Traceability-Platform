@@ -19,7 +19,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { formatWeight, formatDate, truncateHash } from '../../utils/formatters'
-import { downloadBatchAuditPdf } from '../../services/auditService'
+import { downloadBatchAuditPdf, viewBatchAuditPdf } from '../../services/auditService'
 
 export function AttachedCertificatesSection({
   records = [],
@@ -33,6 +33,7 @@ export function AttachedCertificatesSection({
   const [filter, setFilter] = useState('ALL') // ALL, ISSUED, PENDING, DISCREPANT
   const [search, setSearch] = useState('')
   const [downloadingBatchId, setDownloadingBatchId] = useState(null)
+  const [viewingBatchId, setViewingBatchId] = useState(null)
   const [certifyingBatchId, setCertifyingBatchId] = useState(null)
 
   // Map and normalize records to certificate views
@@ -163,6 +164,29 @@ export function AttachedCertificatesSection({
       })
     } finally {
       setDownloadingBatchId(null)
+    }
+  }
+
+  // Handle PDF In-Browser Viewing
+  const handleViewPdf = async (cert) => {
+    const bId = cert.batchId
+    setViewingBatchId(bId)
+    try {
+      const result = await viewBatchAuditPdf(bId)
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+      addToast?.({
+        type: 'info',
+        title: 'Opening Audit PDF',
+        message: `Opening official audit certificate for ${bId} in a new tab.`,
+      })
+    } catch (err) {
+      addToast?.({
+        type: 'danger',
+        title: 'View PDF Failed',
+        message: err.message || 'Could not open audit certificate PDF.',
+      })
+    } finally {
+      setViewingBatchId(null)
     }
   }
 
@@ -394,6 +418,18 @@ export function AttachedCertificatesSection({
                         >
                           <FileText className="w-3.5 h-3.5" />
                           <span>View Report</span>
+                        </button>
+
+                        {/* View PDF In Tab */}
+                        <button
+                          type="button"
+                          onClick={() => handleViewPdf(cert)}
+                          disabled={viewingBatchId === cert.batchId}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#176B45] bg-[#E8F5EE] hover:bg-[#D5EFE0] rounded-xl transition-colors border border-[#C2E3D0] cursor-pointer disabled:opacity-50"
+                          title="View PDF report directly in browser tab"
+                        >
+                          <ExternalLink className={`w-3.5 h-3.5 ${viewingBatchId === cert.batchId ? 'animate-spin' : ''}`} />
+                          <span>{viewingBatchId === cert.batchId ? 'Opening...' : 'View PDF'}</span>
                         </button>
 
                         {/* Print */}

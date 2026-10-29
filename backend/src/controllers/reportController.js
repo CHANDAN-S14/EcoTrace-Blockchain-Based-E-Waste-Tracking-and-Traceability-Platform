@@ -138,29 +138,41 @@ export async function exportReportsCsv(req, res, next) {
 
 export async function exportBatchAuditPdf(req, res, next) {
   try {
-    const batchId = req.params.batchId || req.query.batchId || req.body?.batchId
-    if (!batchId) {
+    const rawBatchId = req.params.batchId || req.query.batchId || req.body?.batchId
+    if (!rawBatchId) {
       return res.status(400).json({ success: false, message: 'Batch ID is required for audit PDF export.' })
     }
 
+    const batchId = String(rawBatchId).trim().replace(/\.pdf$/i, '')
     const dossier = await compileBatchAuditDossier(batchId)
     if (!dossier) {
       return res.status(404).json({ success: false, message: `Batch ${batchId} not found.` })
     }
+
+    const actualBatchId = dossier.batchOverview?.batchId || batchId
+    const isInline = req.query.view === 'true' || req.query.inline === 'true' || req.query.mode === 'inline' || req.query.mode === 'preview'
+    const dispositionType = isInline ? 'inline' : 'attachment'
 
     const doc = new PDFDocument({
       size: 'A4',
       margin: 35,
       bufferPages: true,
       info: {
-        Title: `EcoTrace Audit Report - ${batchId}`,
+        Title: `EcoTrace Audit Report - ${actualBatchId}`,
         Author: 'Central Pollution Control Board (CPCB) Consortium Node',
         Subject: 'EcoTrace National E-Waste Traceability & Mass Conservation Audit Report',
       },
     })
 
+    doc.on('error', (err) => {
+      console.error('[exportBatchAuditPdf] PDF generation stream error:', err)
+      if (!res.headersSent) {
+        next(err)
+      }
+    })
+
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `attachment; filename="EcoTrace_Audit_Report_${batchId}.pdf"`)
+    res.setHeader('Content-Disposition', `${dispositionType}; filename="EcoTrace_Audit_Report_${actualBatchId}.pdf"`)
 
     doc.pipe(res)
 
@@ -655,8 +667,18 @@ export async function exportReportsPdf(req, res, next) {
       },
     })
 
+    const isInline = req.query.view === 'true' || req.query.inline === 'true' || req.query.mode === 'inline' || req.query.mode === 'preview'
+    const dispositionType = isInline ? 'inline' : 'attachment'
+
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', 'attachment; filename="ecotrace-compliance-report.pdf"')
+    res.setHeader('Content-Disposition', `${dispositionType}; filename="ecotrace-compliance-report.pdf"`)
+
+    doc.on('error', (err) => {
+      console.error('[exportReportsPdf] PDF generation stream error:', err)
+      if (!res.headersSent) {
+        next(err)
+      }
+    })
 
     doc.pipe(res)
 
