@@ -23,6 +23,7 @@ import {
   Check,
 } from 'lucide-react'
 import { useBatchStore } from '../hooks/useBatchStore'
+import { request } from '../services/apiClient'
 
 export function FacilitiesPage() {
   const { addToast, refreshFacilities } = useBatchStore()
@@ -55,8 +56,7 @@ export function FacilitiesPage() {
   const loadFacilities = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/facilities')
-      const json = await res.json()
+      const json = await request('/facilities')
       if (json.success && Array.isArray(json.data)) {
         setFacilities(json.data)
         if (json.summary) {
@@ -81,11 +81,9 @@ export function FacilitiesPage() {
   const handleSyncPublicDataset = async () => {
     setIsSyncing(true)
     try {
-      const res = await fetch('/api/facilities/import-public', {
+      const json = await request('/facilities/import-public', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
       })
-      const json = await res.json()
       if (json.success) {
         setLastSyncResult(json)
         addToast({
@@ -157,12 +155,10 @@ export function FacilitiesPage() {
         categoriesAccepted: formData.categoriesAccepted.split(',').map((s) => s.trim()),
       }
 
-      const res = await fetch('/api/facilities', {
+      const json = await request('/facilities', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const json = await res.json()
 
       if (json.success) {
         addToast({
@@ -213,12 +209,10 @@ export function FacilitiesPage() {
             : null,
       }
 
-      const res = await fetch(`/api/facilities/${editingFacility.facilityId}`, {
+      const json = await request(`/facilities/${editingFacility.facilityId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const json = await res.json()
 
       if (json.success) {
         addToast({

@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { useBatchStore } from '../hooks/useBatchStore'
+import { request } from '../services/apiClient'
 
 export function UsersPage() {
   const { addToast } = useBatchStore()
@@ -38,8 +39,7 @@ export function UsersPage() {
   const loadUsers = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/users')
-      const json = await res.json()
+      const json = await request('/users')
       if (json.success && Array.isArray(json.data)) {
         setUsers(json.data)
       } else {
@@ -72,12 +72,10 @@ export function UsersPage() {
   const handleCreateUser = async (e) => {
     e.preventDefault()
     try {
-      const res = await fetch('/api/users', {
+      const json = await request('/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      const json = await res.json()
       if (json.success) {
         addToast({
           type: 'success',
@@ -111,9 +109,8 @@ export function UsersPage() {
   const handleToggleStatus = async (user) => {
     const newStatus = user.accountStatus === 'Active' ? 'Suspended' : 'Active'
     try {
-      await fetch(`/api/users/${user._id || user.id}`, {
+      await request(`/users/${user._id || user.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountStatus: newStatus }),
       })
       addToast({
@@ -133,9 +130,8 @@ export function UsersPage() {
     e.preventDefault()
     if (!editingUser) return
     try {
-      await fetch(`/api/users/${editingUser._id || editingUser.id}`, {
+      await request(`/users/${editingUser._id || editingUser.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingUser),
       })
       addToast({
