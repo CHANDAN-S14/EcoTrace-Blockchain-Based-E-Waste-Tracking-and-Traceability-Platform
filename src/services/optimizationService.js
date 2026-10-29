@@ -36,6 +36,9 @@ export function normalizeOptimizationResult(raw) {
   const executionEvidence = root.executionEvidence || null
 
   const objective = summary.objective || root.objective || 'MINIMIZE_COST'
+  const selectedFacility = root.selectedFacility || assignments[0]?.facilityName || null
+  const selectedFacilityId = root.selectedFacilityId || assignments[0]?.facilityId || null
+  const selectedBatchId = root.selectedBatchId || assignments[0]?.batchId || null
 
   return {
     runId,
@@ -43,6 +46,9 @@ export function normalizeOptimizationResult(raw) {
     engine,
     isQpiAiCloud,
     isFeasible,
+    selectedFacility,
+    selectedFacilityId,
+    selectedBatchId,
     assignments,
     unassignedBatches,
     executionEvidence,
@@ -347,18 +353,29 @@ export async function runQpiAiOptimization({
 }) {
   let backendError = null
 
-  // 1. Attempt backend QpiAI Opt endpoint
+  // 1. Attempt backend QpiAI Opt endpoint (/qubo/dispatch or /optimization/assign)
   try {
-    const response = await request('/optimization/assign', {
-      method: 'POST',
-      body: JSON.stringify({
-        batchIds: selectedBatchIds,
-        facilities,
-        objective,
-        enforceCapacity,
-        enforceLicence,
-      }),
+    const payload = JSON.stringify({
+      batchIds: selectedBatchIds,
+      batchId: selectedBatchIds[0],
+      facilities,
+      objective,
+      enforceCapacity,
+      enforceLicence,
     })
+
+    let response = null
+    try {
+      response = await request('/qubo/dispatch', {
+        method: 'POST',
+        body: payload,
+      })
+    } catch {
+      response = await request('/optimization/assign', {
+        method: 'POST',
+        body: payload,
+      })
+    }
 
     if (response && response.success !== false) {
       const normalized = normalizeOptimizationResult({ data: response, source: 'backend' })

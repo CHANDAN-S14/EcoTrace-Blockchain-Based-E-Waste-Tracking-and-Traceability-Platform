@@ -111,6 +111,7 @@ app.use('/api/recovery', recoveryRoutes)
 app.use('/api/claims', claimRoutes)
 app.use('/api/optimization', optimizationRoutes)
 app.use('/api/dispatch', optimizationRoutes) // Alias for Smart Dispatch
+app.use('/api/qubo', optimizationRoutes) // Direct alias for QpiAI Opt QUBO Dispatch
 app.use('/api/quantum', quantumRoutes)
 app.use('/api/blockchain', blockchainRoutes)
 app.use('/api/audit', auditRoutes)

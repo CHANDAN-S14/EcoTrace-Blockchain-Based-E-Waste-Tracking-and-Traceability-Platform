@@ -128,7 +128,9 @@ export const recoverySchema = z.object({
 })
 
 export const optimizationRunSchema = z.object({
+  batchId: z.string().optional(),
   batchIds: z.array(z.string()).optional().default([]),
+  batches: z.array(z.any()).optional(),
   objective: z.enum(['MINIMIZE_COST', 'MAXIMIZE_YIELD', 'BALANCED_CAPACITY']).default('MINIMIZE_COST'),
   enforceCapacity: z.boolean().default(true),
   enforceLicence: z.boolean().default(true),
