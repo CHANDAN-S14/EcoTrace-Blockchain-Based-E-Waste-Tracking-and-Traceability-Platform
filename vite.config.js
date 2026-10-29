@@ -33,8 +33,9 @@ export default defineConfig({
       },
     },
   },
-  preview: {
-    host: '0.0.0.0',
-    port: Number(process.env.PORT) || 4173,
-  },
+ preview: {
+  host: '0.0.0.0',
+  port: Number(process.env.PORT) || 4173,
+  allowedHosts: ['fronted-1axq.onrender.com'],
+},
 })
