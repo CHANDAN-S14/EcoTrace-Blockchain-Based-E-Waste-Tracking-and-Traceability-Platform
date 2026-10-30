@@ -24,7 +24,7 @@ backend/uploads/*
 # Environment variables
 .env
 .env.example
-backend/.env/example
+backend/.env.example
 backend/.env
 *.local
 
